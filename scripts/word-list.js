@@ -1,7 +1,7 @@
 const wordList = [
     {
-        word: "guitar",
-        hint: "A musical instrument with strings."
+        word: "Pneumonoultramicroscopicsilicovolcanoconiosis ",
+        hint: "A lung disease caused by inhaling fine silica dust"
     },
     {
         word: "oxygen",
