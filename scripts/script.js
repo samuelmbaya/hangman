@@ -6,7 +6,11 @@ const el = {
   hangmanImage: document.querySelector(".hangman-box img"), // The picture that shows the hangman drawing as you guess wrong
   gameModal: document.querySelector(".game-modal"), // The pop-up box that appears when you win or lose
   playAgainBtn: document.querySelector(".game-modal button"), // The button in the pop-up to start a new game
-  hintText: document.querySelector(".hint-text b") // The text that shows a clue for the word
+  hintText: document.querySelector(".hint-text b"), // The text that shows a clue for the word
+  lbModal: document.querySelector(".leaderboard-modal"), // The leaderboard pop-up
+  viewLbBtn: document.getElementById("view-leaderboard"), // Button to open leaderboard
+  closeLbBtn: document.querySelector(".close-lb"), // Button to close leaderboard
+  topScoresUl: document.querySelector(".top-scores") // List for top scores
 };
 
 // Sounds: audio clips we play for different things in the game
@@ -35,6 +39,30 @@ const stopSounds = () => Object.values(s).forEach(sound => { // Go through each 
 let currentWord = '', correctLetters = [], wrongGuessCount = 0; // Start with empty word, no correct letters, and zero wrong guesses
 const maxGuesses = 6; // You can make up to 6 wrong guesses before losing
 
+// Update leaderboard: loads scores from storage, sorts, and displays top 10
+const updateLeaderboard = () => {
+  try {
+    const scores = JSON.parse(localStorage.getItem('hangmanScores') || '{}');
+    const sorted = Object.entries(scores)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 10)
+      .map(([name, score]) => `<li>${name}: ${score} points</li>`)
+      .join('');
+    el.topScoresUl.innerHTML = sorted || '<li>No scores yet!</li>';
+  } catch (e) {
+    el.topScoresUl.innerHTML = '<li>Error loading scores</li>';
+  }
+};
+
+// Leaderboard event listeners
+el.viewLbBtn.addEventListener('click', () => {
+  updateLeaderboard();
+  el.lbModal.classList.add('show');
+});
+el.closeLbBtn.addEventListener('click', () => {
+  el.lbModal.classList.remove('show');
+});
+
 // New game: chooses a random word and sets everything back to the start
 const getRandomWord = () => {
   const { word, hint } = wordList[Math.floor(Math.random() * wordList.length)]; // Pick a random word and its hint from our list
@@ -51,14 +79,54 @@ const getRandomWord = () => {
 
 // Game over: plays a sound and shows the end screen for win or lose
 const gameOver = (isVictory) => {
+  const score = correctLetters.length * 2 - wrongGuessCount; // Calculate score: +2 per unique correct letter, -1 per wrong guess
   playSound(isVictory ? 'win' : 'lose'); // Play the win sound if you won, or lose sound if you lost
   setTimeout(() => { // Wait 400 milliseconds (a short pause) before showing the pop-up
+    const content = el.gameModal.querySelector('.content');
+    // Remove any temporary elements from previous game
+    content.querySelectorAll('.temp-element').forEach(el => el.remove());
     const key = isVictory ? 'victory' : 'lost', // Pick the right picture name (victory or lost)
       title = isVictory ? 'Congrats!' : 'Game Over!', // Pick the right title
       text = isVictory ? 'You found the word:' : 'The correct word was:'; // Pick the right message
-    el.gameModal.querySelector('img').src = `images/${key}.gif`; // Show the win or lose animated picture
-    el.gameModal.querySelector('h4').innerText = title; // Put the title in the pop-up
-    el.gameModal.querySelector('p').innerHTML = `${text} <b>${currentWord}</b>`; // Put the message and the word in the pop-up (make the word bold)
+    content.querySelector('img').src = `images/${key}.gif`; // Show the win or lose animated picture
+    content.querySelector('h4').innerText = title; // Put the title in the pop-up
+    content.querySelector('p').innerHTML = `${text} <b>${currentWord}</b>`; // Put the message and the word in the pop-up (make the word bold)
+    
+    // Add score display
+    const scoreP = document.createElement('p');
+    scoreP.innerHTML = `Game Score: <b>${score}</b>`;
+    scoreP.classList.add('temp-element');
+    content.appendChild(scoreP);
+    
+    // Add name input and save button
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.placeholder = 'Enter your name to save this score';
+    nameInput.classList.add('temp-element');
+    content.appendChild(nameInput);
+    
+    const saveBtn = document.createElement('button');
+    saveBtn.innerText = 'Save Score';
+    saveBtn.classList.add('save-score', 'temp-element');
+    saveBtn.addEventListener('click', () => {
+      const name = nameInput.value.trim();
+      if (name) {
+        try {
+          let scores = JSON.parse(localStorage.getItem('hangmanScores') || '{}');
+          scores[name] = (scores[name] || 0) + score;
+          localStorage.setItem('hangmanScores', JSON.stringify(scores));
+          saveBtn.innerText = 'Saved!';
+          saveBtn.disabled = true;
+          nameInput.value = '';
+        } catch (e) {
+          alert('Error saving score');
+        }
+      } else {
+        alert('Please enter a name');
+      }
+    });
+    content.appendChild(saveBtn);
+    
     el.gameModal.classList.add('show'); // Make the pop-up appear
   }, 400); // End of the wait timer
 }; // That's the end of the gameOver function
