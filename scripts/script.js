@@ -41,6 +41,7 @@ const stopSounds = () => Object.values(s).forEach(sound => { // Go through each 
 // State: keeps track of important game details (like variables that remember things)
 let currentWord = '', correctLetters = [], wrongGuessCount = 0; // Start with empty word, no correct letters, and zero wrong guesses
 let currentUser = localStorage.getItem('currentUser') || ''; // Persistent user name
+let gameEnabled = false; // Flag to enable/disable game interaction
 const maxGuesses = 6; // You can make up to 6 wrong guesses before losing
 
 // Save score: adds the game score to the user's total in storage
@@ -92,6 +93,7 @@ const setUser = () => {
     } catch (e) {
       console.error('Error initializing score:', e);
     }
+    gameEnabled = true;
     el.nameModal.classList.remove('show');
     getRandomWord(); // Start the game
   } else {
@@ -176,6 +178,7 @@ const gameOver = (isVictory) => {
         if (name) {
           currentUser = name;
           localStorage.setItem('currentUser', currentUser);
+          gameEnabled = true;
           // Initialize score to 0 to add user to leaderboard
           try {
             let scores = JSON.parse(localStorage.getItem('hangmanScores') || '{}');
@@ -205,6 +208,7 @@ const gameOver = (isVictory) => {
 
 // Guess handler: checks if a letter is right or wrong and updates the game
 const initGame = (button, letter) => {
+  if (!gameEnabled) return;
   letter = letter.toUpperCase(); // Make sure the letter is uppercase
   button.disabled = true; // Turn off the button so you can't click it again
   if (currentWord.includes(letter)) { // If the word has this letter somewhere
@@ -234,10 +238,13 @@ for (let i = 97; i <= 122; i++) { // Loop through the numbers that make lowercas
   button.innerText = letter; // Put the letter on the button
   el.keyboardDiv.appendChild(button); // Add the button to the keyboard area
   button.addEventListener('click', () => initGame(button, letter)); // When clicked, run the guess checker with this button and letter
-} // End of the loop that makes all the buttons
+}
+// Initially disable all keyboard buttons
+el.keyboardDiv.querySelectorAll('button').forEach(btn => btn.disabled = true);
 
 // Keydown listener: lets you type letters on your real keyboard to guess
 document.addEventListener('keydown', e => { // Listen for any key press on the page
+  if (!gameEnabled) return;
   const letter = e.key.toUpperCase(); // Get what key was pressed and make it uppercase
   if (letter >= 'A' && letter <= 'Z') { // If it's a letter key (A to Z)
     const button = [...el.keyboardDiv.querySelectorAll('button')].find(b => b.innerText === letter); // Find the on-screen button that matches this letter
@@ -253,6 +260,7 @@ el.playAgainBtn.addEventListener('click', () => { // Listen for clicks on the "p
 
 // Start: kicks off the very first game when the page loads
 if (currentUser) {
+  gameEnabled = true;
   getRandomWord(); // If user already set, start game
 } else {
   showNameModal(); // Otherwise, show name entry modal
