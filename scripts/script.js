@@ -10,7 +10,10 @@ const el = {
   lbModal: document.querySelector(".leaderboard-modal"), // The leaderboard pop-up
   viewLbBtn: document.getElementById("view-leaderboard"), // Button to open leaderboard
   closeLbBtn: document.querySelector(".close-lb"), // Button to close leaderboard
-  topScoresUl: document.querySelector(".top-scores") // List for top scores
+  topScoresUl: document.querySelector(".top-scores"), // List for top scores
+  nameModal: document.querySelector(".name-modal"), // Modal for entering name
+  nameInput: document.getElementById("user-name-input"), // Input for name
+  setNameBtn: document.getElementById("set-name") // Button to set name
 };
 
 // Sounds: audio clips we play for different things in the game
@@ -37,7 +40,20 @@ const stopSounds = () => Object.values(s).forEach(sound => { // Go through each 
 
 // State: keeps track of important game details (like variables that remember things)
 let currentWord = '', correctLetters = [], wrongGuessCount = 0; // Start with empty word, no correct letters, and zero wrong guesses
+let currentUser = localStorage.getItem('currentUser') || ''; // Persistent user name
 const maxGuesses = 6; // You can make up to 6 wrong guesses before losing
+
+// Save score: adds the game score to the user's total in storage
+const saveScore = (score) => {
+  if (!currentUser) return; // Don't save if no user
+  try {
+    let scores = JSON.parse(localStorage.getItem('hangmanScores') || '{}');
+    scores[currentUser] = (scores[currentUser] || 0) + score;
+    localStorage.setItem('hangmanScores', JSON.stringify(scores));
+  } catch (e) {
+    console.error('Error saving score:', e);
+  }
+};
 
 // Update leaderboard: loads scores from storage, sorts, and displays top 10
 const updateLeaderboard = () => {
@@ -46,13 +62,38 @@ const updateLeaderboard = () => {
     const sorted = Object.entries(scores)
       .sort(([,a], [,b]) => b - a)
       .slice(0, 10)
-      .map(([name, score]) => `<li>${name}: ${score} points</li>`)
+      .map(([name, score]) => `<li>${name}: <b>${score}</b> points</li>`)
       .join('');
     el.topScoresUl.innerHTML = sorted || '<li>No scores yet!</li>';
   } catch (e) {
     el.topScoresUl.innerHTML = '<li>Error loading scores</li>';
   }
 };
+
+// Show name modal: displays the modal for entering name
+const showNameModal = () => {
+  el.nameInput.value = '';
+  el.nameModal.classList.add('show');
+};
+
+// Set user: saves the name and starts the game
+const setUser = () => {
+  const name = el.nameInput.value.trim();
+  if (name) {
+    currentUser = name;
+    localStorage.setItem('currentUser', currentUser);
+    el.nameModal.classList.remove('show');
+    getRandomWord(); // Start the game
+  } else {
+    alert('Please enter a name');
+  }
+};
+
+// Name modal event listeners
+el.setNameBtn.addEventListener('click', setUser);
+el.nameInput.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') setUser();
+});
 
 // Leaderboard event listeners
 el.viewLbBtn.addEventListener('click', () => {
@@ -80,6 +121,9 @@ const getRandomWord = () => {
 // Game over: plays a sound and shows the end screen for win or lose
 const gameOver = (isVictory) => {
   const score = correctLetters.length * 2 - wrongGuessCount; // Calculate score: +2 per unique correct letter, -1 per wrong guess
+  if (currentUser) {
+    saveScore(score); // Automatically save if user is set
+  }
   playSound(isVictory ? 'win' : 'lose'); // Play the win sound if you won, or lose sound if you lost
   setTimeout(() => { // Wait 400 milliseconds (a short pause) before showing the pop-up
     const content = el.gameModal.querySelector('.content');
@@ -95,37 +139,44 @@ const gameOver = (isVictory) => {
     // Add score display
     const scoreP = document.createElement('p');
     scoreP.innerHTML = `Game Score: <b>${score}</b>`;
+    if (currentUser) {
+      scoreP.innerHTML += ` (Total: <b>${JSON.parse(localStorage.getItem('hangmanScores') || '{}')[currentUser] || 0}</b>)`;
+    }
     scoreP.classList.add('temp-element');
     content.appendChild(scoreP);
     
-    // Add name input and save button
-    const nameInput = document.createElement('input');
-    nameInput.type = 'text';
-    nameInput.placeholder = 'Enter your name to save this score';
-    nameInput.classList.add('temp-element');
-    content.appendChild(nameInput);
-    
-    const saveBtn = document.createElement('button');
-    saveBtn.innerText = 'Save Score';
-    saveBtn.classList.add('save-score', 'temp-element');
-    saveBtn.addEventListener('click', () => {
-      const name = nameInput.value.trim();
-      if (name) {
-        try {
-          let scores = JSON.parse(localStorage.getItem('hangmanScores') || '{}');
-          scores[name] = (scores[name] || 0) + score;
-          localStorage.setItem('hangmanScores', JSON.stringify(scores));
-          saveBtn.innerText = 'Saved!';
-          saveBtn.disabled = true;
-          nameInput.value = '';
-        } catch (e) {
-          alert('Error saving score');
+    // If no user, prompt to join
+    if (!currentUser) {
+      const joinP = document.createElement('p');
+      joinP.innerHTML = 'Enter your name below to join the leaderboard and save your scores!';
+      joinP.classList.add('temp-element');
+      content.appendChild(joinP);
+      
+      const nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      nameInput.placeholder = 'Enter your name';
+      nameInput.classList.add('temp-element');
+      content.appendChild(nameInput);
+      
+      const joinBtn = document.createElement('button');
+      joinBtn.innerText = 'Join Leaderboard';
+      joinBtn.classList.add('temp-element');
+      joinBtn.addEventListener('click', () => {
+        const name = nameInput.value.trim();
+        if (name) {
+          currentUser = name;
+          localStorage.setItem('currentUser', currentUser);
+          saveScore(score);
+          joinBtn.innerText = 'Joined!';
+          joinBtn.disabled = true;
+          // Refresh score display
+          scoreP.innerHTML = `Game Score: <b>${score}</b> (Total: <b>${JSON.parse(localStorage.getItem('hangmanScores') || '{}')[currentUser] || 0}</b>)`;
+        } else {
+          alert('Please enter a name');
         }
-      } else {
-        alert('Please enter a name');
-      }
-    });
-    content.appendChild(saveBtn);
+      });
+      content.appendChild(joinBtn);
+    }
     
     el.gameModal.classList.add('show'); // Make the pop-up appear
   }, 400); // End of the wait timer
@@ -180,4 +231,8 @@ el.playAgainBtn.addEventListener('click', () => { // Listen for clicks on the "p
 }); // End of the click listener
 
 // Start: kicks off the very first game when the page loads
-getRandomWord(); // Pick the first random word and set up the game
+if (currentUser) {
+  getRandomWord(); // If user already set, start game
+} else {
+  showNameModal(); // Otherwise, show name entry modal
+}
