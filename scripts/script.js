@@ -13,7 +13,9 @@ const el = {
   topScoresUl: document.querySelector(".top-scores"), // List for top scores
   nameModal: document.querySelector(".name-modal"), // Modal for entering name
   nameInput: document.getElementById("user-name-input"), // Input for name
-  setNameBtn: document.getElementById("set-name") // Button to set name
+  setNameBtn: document.getElementById("set-name"), // Button to set name
+  switchUserBtn: document.getElementById("switch-user"), // Button to switch user
+  currentUserP: document.getElementById("current-user") // Paragraph to show current user
 };
 
 // Sounds: audio clips we play for different things in the game
@@ -63,11 +65,25 @@ const updateLeaderboard = () => {
     const sorted = Object.entries(scores)
       .sort(([,a], [,b]) => b - a)
       .slice(0, 10)
-      .map(([name, score]) => `<li>${name}: <b>${score}</b> points</li>`)
+      .map(([name, score]) => {
+        const isCurrent = name === currentUser;
+        return `<li${isCurrent ? ' class="current-user"' : ''}>${name}: <b>${score}</b> points</li>`;
+      })
       .join('');
     el.topScoresUl.innerHTML = sorted || '<li>No scores yet!</li>';
   } catch (e) {
     el.topScoresUl.innerHTML = '<li>Error loading scores</li>';
+  }
+};
+
+// Update current user display
+const updateCurrentUserDisplay = () => {
+  if (currentUser) {
+    el.currentUserP.innerText = `Playing as: ${currentUser}`;
+    el.switchUserBtn.style.display = 'block';
+  } else {
+    el.currentUserP.innerText = '';
+    el.switchUserBtn.style.display = 'none';
   }
 };
 
@@ -95,10 +111,28 @@ const setUser = () => {
     }
     gameEnabled = true;
     el.nameModal.classList.remove('show');
+    updateCurrentUserDisplay();
     getRandomWord(); // Start the game
   } else {
     alert('Please enter a name');
   }
+};
+
+// Switch user: clear current user and show name modal
+const switchUser = () => {
+  currentUser = '';
+  localStorage.removeItem('currentUser');
+  gameEnabled = false;
+  // Disable game elements
+  el.keyboardDiv.querySelectorAll('button').forEach(btn => btn.disabled = true);
+  // Reset game display
+  el.wordDisplay.innerHTML = '';
+  el.hintText.innerText = '';
+  el.guessesText.innerText = '';
+  el.hangmanImage.src = '';
+  stopSounds();
+  updateCurrentUserDisplay();
+  showNameModal();
 };
 
 // Name modal event listeners
@@ -106,6 +140,9 @@ el.setNameBtn.addEventListener('click', setUser);
 el.nameInput.addEventListener('keypress', (e) => {
   if (e.key === 'Enter') setUser();
 });
+
+// Switch user listener
+el.switchUserBtn.addEventListener('click', switchUser);
 
 // Leaderboard event listeners
 el.viewLbBtn.addEventListener('click', () => {
@@ -152,7 +189,12 @@ const gameOver = (isVictory) => {
     const scoreP = document.createElement('p');
     scoreP.innerHTML = `Game Score: <b>${score}</b>`;
     if (currentUser) {
-      scoreP.innerHTML += ` (Total: <b>${JSON.parse(localStorage.getItem('hangmanScores') || '{}')[currentUser] || 0}</b>)`;
+      try {
+        const scores = JSON.parse(localStorage.getItem('hangmanScores') || '{}');
+        scoreP.innerHTML += ` (Total: <b>${scores[currentUser] || 0}</b>)`;
+      } catch (e) {
+        // Fallback
+      }
     }
     scoreP.classList.add('temp-element');
     content.appendChild(scoreP);
@@ -179,6 +221,7 @@ const gameOver = (isVictory) => {
           currentUser = name;
           localStorage.setItem('currentUser', currentUser);
           gameEnabled = true;
+          updateCurrentUserDisplay();
           // Initialize score to 0 to add user to leaderboard
           try {
             let scores = JSON.parse(localStorage.getItem('hangmanScores') || '{}');
@@ -194,7 +237,7 @@ const gameOver = (isVictory) => {
           joinBtn.innerText = 'Joined!';
           joinBtn.disabled = true;
           // Refresh score display
-          scoreP.innerHTML = `Game Score: <b>${score}</b> (Total: <b>${JSON.parse(localStorage.getItem('hangmanScores') || '{}')[currentUser] || 0}</b>)`;
+          scoreP.innerHTML = `Game Score: <b>${score}</b> (Total: <b>${score}</b>)`;
         } else {
           alert('Please enter a name');
         }
@@ -238,7 +281,8 @@ for (let i = 97; i <= 122; i++) { // Loop through the numbers that make lowercas
   button.innerText = letter; // Put the letter on the button
   el.keyboardDiv.appendChild(button); // Add the button to the keyboard area
   button.addEventListener('click', () => initGame(button, letter)); // When clicked, run the guess checker with this button and letter
-}
+} // End of the loop that makes all the buttons
+
 // Initially disable all keyboard buttons
 el.keyboardDiv.querySelectorAll('button').forEach(btn => btn.disabled = true);
 
@@ -261,6 +305,7 @@ el.playAgainBtn.addEventListener('click', () => { // Listen for clicks on the "p
 // Start: kicks off the very first game when the page loads
 if (currentUser) {
   gameEnabled = true;
+  updateCurrentUserDisplay();
   getRandomWord(); // If user already set, start game
 } else {
   showNameModal(); // Otherwise, show name entry modal
