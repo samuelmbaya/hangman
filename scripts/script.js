@@ -82,6 +82,16 @@ const setUser = () => {
   if (name) {
     currentUser = name;
     localStorage.setItem('currentUser', currentUser);
+    // Initialize score to 0 to add user to leaderboard
+    try {
+      let scores = JSON.parse(localStorage.getItem('hangmanScores') || '{}');
+      if (!(currentUser in scores)) {
+        scores[currentUser] = 0;
+        localStorage.setItem('hangmanScores', JSON.stringify(scores));
+      }
+    } catch (e) {
+      console.error('Error initializing score:', e);
+    }
     el.nameModal.classList.remove('show');
     getRandomWord(); // Start the game
   } else {
@@ -166,7 +176,18 @@ const gameOver = (isVictory) => {
         if (name) {
           currentUser = name;
           localStorage.setItem('currentUser', currentUser);
-          saveScore(score);
+          // Initialize score to 0 to add user to leaderboard
+          try {
+            let scores = JSON.parse(localStorage.getItem('hangmanScores') || '{}');
+            if (!(currentUser in scores)) {
+              scores[currentUser] = 0;
+              localStorage.setItem('hangmanScores', JSON.stringify(scores));
+            }
+            scores[currentUser] += score; // Add the current game score
+            localStorage.setItem('hangmanScores', JSON.stringify(scores));
+          } catch (e) {
+            console.error('Error initializing and saving score:', e);
+          }
           joinBtn.innerText = 'Joined!';
           joinBtn.disabled = true;
           // Refresh score display
